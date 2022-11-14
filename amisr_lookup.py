@@ -4,50 +4,63 @@
 # Requires sqlalchemy and the appropriate AMISR SQL database
 
 import datetime as dt
-import sqlalchemy as db
+import sqlalchemy
+from sqlalchemy.ext.automap import automap_base
 import pathlib
 import re
-
-# import sys
-# sys.path.append(pathlib.Path(__file__).parent.resolve())
-# from space_track_credentials import amisr_dbfile_path
 
 
 class AMISR_lookup(object):
 
-    def __init__(self, radar):
+    def __init__(self, radar, procdb_file=None):
+
         self.radar = radar
-        amisr_dbfile_path = pathlib.Path(__file__).parent.resolve()
-        # find all AMISR experiments files that fall within specified time
-        dbfile =
-        self.engine = db.create_engine('sqlite:///'+str(amisr_dbfile_path)+'{}_only_experiment_info.db'.format(radar))
-        # with engine.connect() as conn:
-        self.conn = self.engine.connect()
-        self.exp = db.Table('experiment', db.MetaData(), autoload=True, autoload_with=self.engine)
-        self.params = [self.exp.columns.experiment, self.exp.columns.mode, self.exp.columns.start_time, self.exp.columns.end_time]
+
+        if not procdb_file:
+            procdb_file = pathlib.Path(__file__).parent.resolve().joinpath('amisrdb')
+
+        self.initialize_db(procdb_file)
+
+
+    def initialize_db(self, procdb_file):
+        Base = automap_base()
+        engine = sqlalchemy.create_engine('sqlite:///'+str(procdb_file))
+        Base.prepare(engine, reflect=True)
+        self.session = sqlalchemy.orm.Session(engine)
+        self.db = Base.classes
 
     def find_experiments(self, starttime, endtime):
-        unixstarttime = (starttime-dt.datetime.utcfromtimestamp(0)).total_seconds()
-        unixendtime = (endtime-dt.datetime.utcfromtimestamp(0)).total_seconds()
 
-        # queary AMISR database for experiments in this time frame
-        condition = db.and_(self.exp.columns.end_time>unixstarttime, self.exp.columns.start_time<unixendtime)
-        query = db.select(self.params).where(condition)
-        exp_list = self.conn.execute(query).fetchall()
+        # Get instrument ID number
+        # Consider moving this outside of function?  Should be constant for class
+        inst_id = self.session.query(self.db.procdb_instrument).filter(self.db.procdb_instrument.abbr == self.radar).one().id
 
-        return [{'experiment_number':exp.experiment, 'mode':exp.mode, 'start_time':exp.start_time, 'end_time':exp.end_time} for exp in exp_list]
+        # Find experiment by start/end times and radar id
+        conditions = sqlalchemy.and_(self.db.procdb_experiment.inst_id==inst_id, self.db.procdb_experiment.end_time>starttime, self.db.procdb_experiment.start_time<endtime)
+        filt_exp = self.session.query(self.db.procdb_experiment).filter(conditions)
 
-    # def check_master_exp(self, exp, procdir='/Volumes/AMISR_PROCESSED/processed_data'):
-    #     exp_path = self.experiment_path(exp, procdir)
+        # Create list of experiments
+        exp_list = list()
+        for q in filt_exp:
+            mode = self.session.query(self.db.procdb_experimenttype).filter(self.db.procdb_experimenttype.id == q.type_id).one().label
+            exp_list.append({'exp_num':q.name, 'mode':mode, 'mast_exp':q.master_exp})
+
+        return exp_list
+
 
     def experiment_path(self, exp, procdir='/Volumes/AMISR_PROCESSED/processed_data'):
 
-        expdir = pathlib.Path(procdir, self.radar.upper(), exp['experiment_number'][0:4], exp['experiment_number'][4:6], exp['mode'], exp['experiment_number'])
+        if exp['mast_exp']:
+            experiment_number = exp['mast_exp']
+        else:
+            experiment_number = exp['exp_num']
+
+        expdir = pathlib.Path(procdir, self.radar, experiment_number[0:4], experiment_number[4:6], exp['mode'], experiment_number)
         print(expdir)
 
         # check if path exists before returning
         if not expdir.exists():
-            expdir = expdir.with_name(exp['experiment_number']+'.done')
+            expdir = expdir.with_name(experiment_number+'.done')
 
         if expdir.exists():
             return expdir
@@ -115,12 +128,12 @@ class AMISR_lookup(object):
 
 
 
-    def site_coords(self):
-        site = db.Table('site', db.MetaData(), autoload=True, autoload_with=self.engine)
-        query = db.select([site.columns.latitude, site.columns.longitude]).where(site.columns.shortname==self.radar.lower())
-        radar_site = self.conn.execute(query).fetchall()[0]
-        return radar_site
-
-
-    def __del__(self):
-        self.conn.close()
+    # def site_coords(self):
+    #     site = db.Table('site', db.MetaData(), autoload=True, autoload_with=self.engine)
+    #     query = db.select([site.columns.latitude, site.columns.longitude]).where(site.columns.shortname==self.radar.lower())
+    #     radar_site = self.conn.execute(query).fetchall()[0]
+    #     return radar_site
+    #
+    #
+    # def __del__(self):
+    #     self.conn.close()
