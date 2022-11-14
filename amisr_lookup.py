@@ -8,17 +8,19 @@ import sqlalchemy as db
 import pathlib
 import re
 
-import sys
-sys.path.append(pathlib.Path(__file__).parent.resolve())
-from space_track_credentials import amisr_dbfile_path
+# import sys
+# sys.path.append(pathlib.Path(__file__).parent.resolve())
+# from space_track_credentials import amisr_dbfile_path
 
 
 class AMISR_lookup(object):
 
     def __init__(self, radar):
         self.radar = radar
+        amisr_dbfile_path = pathlib.Path(__file__).parent.resolve()
         # find all AMISR experiments files that fall within specified time
-        self.engine = db.create_engine('sqlite:///'+amisr_dbfile_path+'{}_only_experiment_info.db'.format(radar))
+        dbfile =
+        self.engine = db.create_engine('sqlite:///'+str(amisr_dbfile_path)+'{}_only_experiment_info.db'.format(radar))
         # with engine.connect() as conn:
         self.conn = self.engine.connect()
         self.exp = db.Table('experiment', db.MetaData(), autoload=True, autoload_with=self.engine)
