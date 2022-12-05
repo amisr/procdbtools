@@ -56,7 +56,7 @@ class AMISR_lookup(object):
             experiment_number = exp['exp_num']
 
         expdir = pathlib.Path(procdir, self.radar, experiment_number[0:4], experiment_number[4:6], exp['mode'], experiment_number)
-        print(expdir)
+        # print(expdir)
 
         # check if path exists before returning
         if not expdir.exists():
