@@ -79,7 +79,7 @@ class AMISR_lookup(object):
 
 
 
-    def select_experiment_file(self, experiment_path, type='lp'):
+    def select_experiment_file(self, experiment_path, type='lp', check_exists=False):
 
         if not experiment_path:
             return None
@@ -104,8 +104,13 @@ class AMISR_lookup(object):
         timeres = [int(re.search(r'\d+min', f).group()[:-3]) for f in calfiles]
         datafile = calfiles[timeres.index(min(timeres))]
 
+        filename = experiment_path.joinpath(datafile)
 
-        return experiment_path.joinpath(datafile)
+        if check_exists:
+            if not filename.is_file():
+                return None
+
+        return filename
 
 
 
