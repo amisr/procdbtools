@@ -15,7 +15,7 @@ import datetime as dt
 import sqlalchemy
 import pathlib
 import re
-from importlib_resources import files
+from importlib.resources import files
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import relationship, backref, sessionmaker
