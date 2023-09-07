@@ -8,12 +8,12 @@ import datetime as dt
 from amisr_lookup import AMISR_lookup
 
 
-risrdb = AMISR_lookup('RISR-N')
+risrdb = AMISR_lookup('PFISR')
 
 # experiments = risrdb.find_experiments(dt.datetime(2009,1,1), dt.datetime(2023,1,1))
 experiments = risrdb.find_experiments(dt.datetime(2017,11,1), dt.datetime(2017,12,1))
 
-with open('RISRN_file_list.txt', 'w') as outfile:
+with open('PFISR_file_list.txt', 'w') as outfile:
 
     for e in experiments:
         print(e['exp_num'])

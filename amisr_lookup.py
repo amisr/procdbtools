@@ -3,106 +3,153 @@
 #   including mode/experiment information.
 # Requires sqlalchemy and the appropriate AMISR SQL database
 
+# Change name to datasearchtools? - amisr_find_experiment
+# combine both raw and processed tools
+# Capable to check that file exists on NAS AND/OR file available to download
+# Given this time interval, what experiment was running
+#
+# Cron to update data every hour - currently in Pablo's workspace
+
+
 import datetime as dt
 import sqlalchemy
-from sqlalchemy.ext.automap import automap_base
 import pathlib
 import re
 
 
-class AMISR_lookup(object):
+from sqlalchemy import create_engine
+from sqlalchemy.orm import relationship, backref, sessionmaker
 
-    def __init__(self, radar, procdb_file=None):
+import sys
+# move to main src code directory
+sys.path.append('/Users/e30737/Desktop/Projects/AMISR/procdbtools/PFISR_RISR_rawdatabase_June2022')
+import dbmodels5 as db
+
+# Add command line programs to:
+# 1. Given time, print experiment number and mode
+# 2. Create file list
+
+
+class AMISR_lookup(object):
+#    # OPTIONS:
+#    1. Return just experiment number
+#    2. Return experiment number and other information (ie, mode)
+#    3. Return path to experiment
+#    4. Return path to specific file
+#    5. Return all of the above??
+
+    def __init__(self, radar, procdb_file=None, db_path=None):
 
         self.radar = radar
 
         if not procdb_file:
-            procdb_file = pathlib.Path(__file__).parent.resolve().joinpath('amisrdb')
+            # Use package data instead? (eventually)
+            procdb_file = pathlib.Path(__file__).parent.resolve().joinpath('PFISR_RISR_rawdatabase_June2022/experiment_info5.db')
 
-        self.initialize_db(procdb_file)
+
+        engine = create_engine("sqlite:///{}".format(procdb_file))
+        Session = sessionmaker(bind=engine)
+        self.session = Session()
 
 
-    def initialize_db(self, procdb_file):
-        Base = automap_base()
-        engine = sqlalchemy.create_engine('sqlite:///'+str(procdb_file))
-        Base.prepare(engine, reflect=True)
-        self.session = sqlalchemy.orm.Session(engine)
-        self.db = Base.classes
 
     def find_experiments(self, starttime, endtime):
+        """
+        Return list of all experiments between two times
+        """
 
         # Get instrument ID number
         # Consider moving this outside of function?  Should be constant for class
-        inst_id = self.session.query(self.db.procdb_instrument).filter(self.db.procdb_instrument.abbr == self.radar).one().id
+        radar_shortname = self.radar.replace('-','').lower()
+        site = self.session.query(db.Site).filter(db.Site.shortname==radar_shortname).one()
+        inst_id = site.id
 
         # Find experiment by start/end times and radar id
-        conditions = sqlalchemy.and_(self.db.procdb_experiment.inst_id==inst_id, self.db.procdb_experiment.end_time>starttime, self.db.procdb_experiment.start_time<endtime)
-        filt_exp = self.session.query(self.db.procdb_experiment).filter(conditions)
+        ustarttime = (starttime-dt.datetime.utcfromtimestamp(0)).total_seconds()
+        uendtime = (endtime-dt.datetime.utcfromtimestamp(0)).total_seconds()
+        conditions = sqlalchemy.and_(db.Experiment.site_id==inst_id, db.Experiment.end_time>ustarttime, db.Experiment.start_time<uendtime)
+        filt_exp = self.session.query(db.Experiment).filter(conditions).all()
 
-        # Create list of experiments
-        exp_list = list()
-        for q in filt_exp:
-            mode = self.session.query(self.db.procdb_experimenttype).filter(self.db.procdb_experimenttype.id == q.type_id).one().label
-            exp_list.append({'exp_num':q.name, 'mode':mode, 'mast_exp':q.master_exp})
+        return filt_exp
 
-        return exp_list
+    def experiment_number(self, starttime, endtime):
+        """
+        Return just a list of experiment numbers
+        """
+        exp_list = self.find_experiments(starttime, endtime)
+        exp_num = [exp.experiment for exp in exp_list]
+        return exp_num
+
+    def get_mode(self, exp):
+        mode_id = exp.mode_id
+        mode = self.session.query(db.RadarMode).filter(db.RadarMode.id==mode_id).one()
+        return mode.name
 
 
     def experiment_path(self, exp, procdir='/Volumes/AMISR_PROCESSED/processed_data'):
+        """
+        Return the full path to a given experiment directory
+        """
 
-        if exp['mast_exp']:
-            experiment_number = exp['mast_exp']
-        else:
-            experiment_number = exp['exp_num']
+        mode = self.get_mode(exp)
 
-        expdir = pathlib.Path(procdir, self.radar, experiment_number[0:4], experiment_number[4:6], exp['mode'], experiment_number)
-        # print(expdir)
+        expdir = pathlib.Path(procdir, self.radar, f'{exp.start_year:04}', f'{exp.start_month:02}', mode, exp.experiment)
 
         # check if path exists before returning
         if not expdir.exists():
-            expdir = expdir.with_name(experiment_number+'.done')
+            expdir = expdir.with_name(exp.experiment+'.done')
 
         if expdir.exists():
             return expdir
         else:
             return None
 
-        # try:
-        #     path = '/Volumes/AMISR_PROCESSED/processed_data/RISR-N/{}/{}/{}/{}'.format(exp.experiment[0:4],exp.experiment[4:6],exp.mode,exp.experiment)
-        #     datafiles = [f for f in os.listdir(path) if (f.endswith('h5') and '_lp_' in f)]
-        # except OSError:
-        #     try:
-        #         path = '/Volumes/AMISR_PROCESSED/processed_data/RISR-N/{}/{}/{}/{}.done'.format(exp.experiment[0:4],exp.experiment[4:6],exp.mode,exp.experiment)
-        #         datafiles = [f for f in os.listdir(path) if (f.endswith('h5') and '_lp_' in f)]
-        #     except OSError:
-        #         continue
 
 
+    def select_datafile(self, exp, pulse=None, integration=None, cal=None, check_exists=False):
 
-    def select_experiment_file(self, experiment_path, type='lp', check_exists=False):
-
+        # Get path to experiment
+        experiment_path = self.experiment_path(exp)
         if not experiment_path:
             return None
 
-        exp_num = experiment_path.name
         datafiles = [f.name for f in experiment_path.glob('*.h5')]
-        # print(datafiles)
 
+        # Reduce set to only files with the correct pulse
+        datafiles = [df for df in datafiles if df.startswith(f'{exp.experiment}_{pulse}')]
 
-
-        # create list of "normal" fitted files, fitcal if available, then cal, then all others
-        calfiles = [f for f in datafiles if re.match(r'{}_{}_\d+min-fitcal.h5'.format(exp_num, type), f)]
-        if not calfiles:
-            calfiles = [f for f in datafiles if re.match(r'{}_{}_\d+min-cal.h5'.format(exp_num, type), f)]
-        if not calfiles:
-            calfiles = [f for f in datafiles if re.match(r'{}_{}_\d+min.h5'.format(exp_num, type), f)]
-        if not calfiles:
+        if not datafiles:
             return None
 
+        # If no time resolution specified, find file with shortest integration time
+        if not integration:
+            int_times = list()
+            for df in datafiles:
+                time_re = re.search(r'\d+min', df)
+                if time_re:
+                    int_times.append(int(time_re.group()[:-3]))
+                else:
+                    continue
+            timeres = min(int_times)
+            integration = f'{timeres}min'
+        # Select files with specified integration time
+        datafiles = [df for df in datafiles if df.startswith(f'{exp.experiment}_{pulse}_{integration}-')]
 
-        # Get file with minimum time resolution
-        timeres = [int(re.search(r'\d+min', f).group()[:-3]) for f in calfiles]
-        datafile = calfiles[timeres.index(min(timeres))]
+        # If cal not specified, use deault ordering
+        if not cal:
+            if any([df.endswith('min-fitcal.h5') for df in datafiles]):
+                cal = 'fitcal'
+            elif any([df.endswith('min-cal.h5') for df in datafiles]):
+                cal = 'cal'
+            else:
+                cal = ''
+        # Select file with specified calibration
+        datafiles = [df for df in datafiles if df.startswith(f'{exp.experiment}_{pulse}_{integration}-{cal}')]
+ 
+        try:
+            datafile = datafiles[0]
+        except IndexError:
+            return None
 
         filename = experiment_path.joinpath(datafile)
 
@@ -114,31 +161,10 @@ class AMISR_lookup(object):
 
 
 
-        # # choose file with shortest time resolution
-        # try:
-        #     timeres = [int(re.search(r'\d+min', f).group()[:-3]) for f in calfiles]
-        #     datafile = calfiles[timeres.index(inttime)]
-        #     # fileres = inttime
-        #     postint = False
-        # except ValueError:
-        #     try:
-        #         datafile = calfiles[timeres.index(min(timeres))]
-        #         # fileres = min(timeres)
-        #         postint = True
-        #     except ValueError:
-        #         continue
-        #
-        # print(os.path.join(path,datafile))
-        # num_files += 1
 
-
-
-    # def site_coords(self):
-    #     site = db.Table('site', db.MetaData(), autoload=True, autoload_with=self.engine)
-    #     query = db.select([site.columns.latitude, site.columns.longitude]).where(site.columns.shortname==self.radar.lower())
-    #     radar_site = self.conn.execute(query).fetchall()[0]
-    #     return radar_site
-    #
-    #
-    # def __del__(self):
-    #     self.conn.close()
+    def site_coords(self):
+        radar_shortname = self.radar.replace('-','').lower()
+        site = self.session.query(db.Site).filter(db.Site.shortname==radar_shortname).one()
+        return site
+    
+    
