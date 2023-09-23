@@ -45,10 +45,15 @@ class AMISR_lookup(object):
             # Use package data instead? (eventually)
             procdb_file = files('procdbtools').joinpath('experiment_info5.db')
 
-
         engine = create_engine("sqlite:///{}".format(procdb_file))
         Session = sessionmaker(bind=engine)
         self.session = Session()
+
+        if db_path:
+            self.db_path = db_path
+        else:
+            self.db_path = '/Volumes/AMISR_PROCESSED/processed_data'
+        # Check that this path exists and do something if not valid??
 
 
 
@@ -85,14 +90,14 @@ class AMISR_lookup(object):
         return mode.name
 
 
-    def experiment_path(self, exp, procdir='/Volumes/AMISR_PROCESSED/processed_data'):
+    def experiment_path(self, exp):
         """
         Return the full path to a given experiment directory
         """
 
         mode = self.get_mode(exp)
 
-        expdir = pathlib.Path(procdir, self.radar, f'{exp.start_year:04}', f'{exp.start_month:02}', mode, exp.experiment)
+        expdir = pathlib.Path(self.db_path, self.radar, f'{exp.start_year:04}', f'{exp.start_month:02}', mode, exp.experiment)
 
         # check if path exists before returning
         if not expdir.exists():
@@ -145,6 +150,55 @@ class AMISR_lookup(object):
         # Select file with specified calibration
         datafiles = [df for df in datafiles if df.startswith(f'{exp.experiment}_{pulse}_{integration}-{cal}')]
  
+        try:
+            datafile = datafiles[0]
+        except IndexError:
+            return None
+
+        filename = experiment_path.joinpath(datafile)
+
+        if check_exists:
+            if not filename.is_file():
+                return None
+
+        return filename
+
+
+    def select_vvels_datafile(self, exp, pulse=None, integration=None, post_integrate=False, check_exists=False):
+
+        # Get path to experiment
+        experiment_path = self.experiment_path(exp)
+        if not experiment_path:
+            return None
+        experiment_path = experiment_path.joinpath('derivedParams/new_vvels')
+
+        datafiles = [f.name for f in experiment_path.glob('*.h5')]
+
+        # Reduce set to only files with the correct pulse
+        datafiles = [df for df in datafiles if df.startswith(f'{exp.experiment}_{pulse}')]
+
+        if not datafiles:
+            return None
+
+        # If no time resolution specified, find file with shortest integration time
+        if not integration:
+            int_times = list()
+            for df in datafiles:
+                time_re = re.search(r'\d+min', df)
+                if time_re:
+                    int_times.append(int(time_re.group()[:-3]))
+                else:
+                    continue
+            timeres = min(int_times)
+            integration = f'{timeres}min'
+
+        # Select files with specified integration time
+        if not post_integrate:
+            datafiles = [df for df in datafiles if df.startswith(f'{exp.experiment}_{pulse}_{integration}-')]
+        else:
+            datafiles = [df for df in datafiles if df.endswith(f'-{integration}.h5')]
+
+
         try:
             datafile = datafiles[0]
         except IndexError:
