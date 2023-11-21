@@ -164,13 +164,13 @@ class AMISR_lookup(object):
         return filename
 
 
-    def select_vvels_datafile(self, exp, pulse=None, integration=None, post_integrate=False, check_exists=False):
+    def select_vvels_datafile(self, exp, pulse=None, integration=None, post_integrate=False, check_exists=False, vvels_exp_path='derivedParams/new_vvels'):
 
         # Get path to experiment
         experiment_path = self.experiment_path(exp)
         if not experiment_path:
             return None
-        experiment_path = experiment_path.joinpath('derivedParams/new_vvels')
+        experiment_path = experiment_path.joinpath(vvels_exp_path)
 
         datafiles = [f.name for f in experiment_path.glob('*.h5')]
 
