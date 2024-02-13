@@ -10,6 +10,15 @@
 #
 # Cron to update data every hour - currently in Pablo's workspace
 
+####################################################################
+#  UPDATING DATABASE FILE
+# To update the database file (amisrdb), copy it from io2 at the
+# following file path:
+#
+# /opt/websites/database/calendar/isr_database/amisrdb
+#
+#####################################################################
+
 
 import datetime as dt
 import sqlalchemy
@@ -17,10 +26,13 @@ import pathlib
 import re
 from importlib.resources import files
 
+import sqlalchemy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import relationship, backref, sessionmaker
 
-from .dbmodels import Site, Experiment, RadarMode
+#from .dbmodels import Site, Experiment, RadarMode
+from .procdbmodels import *
+from .manage_database import procdb_file as default_procdb_file
 
 # Add command line programs to:
 # 1. Given time, print experiment number and mode
@@ -42,8 +54,8 @@ class AMISR_lookup(object):
         self.radar = radar
 
         if not procdb_file:
-            # Use package data instead? (eventually)
-            procdb_file = files('procdbtools').joinpath('experiment_info5.db')
+            procdb_file = default_procdb_file
+
 
         engine = create_engine("sqlite:///{}".format(procdb_file))
         Session = sessionmaker(bind=engine)
@@ -63,16 +75,14 @@ class AMISR_lookup(object):
         """
 
         # Get instrument ID number
-        # Consider moving this outside of function?  Should be constant for class
-        radar_shortname = self.radar.replace('-','').lower()
-        site = self.session.query(Site).filter(Site.shortname==radar_shortname).one()
-        inst_id = site.id
+        inst = self.session.query(ProcdbInstrument).filter(ProcdbInstrument.abbr==self.radar).one()
+        inst_id = inst.id
 
         # Find experiment by start/end times and radar id
-        ustarttime = (starttime-dt.datetime.utcfromtimestamp(0)).total_seconds()
-        uendtime = (endtime-dt.datetime.utcfromtimestamp(0)).total_seconds()
-        conditions = sqlalchemy.and_(Experiment.site_id==inst_id, Experiment.end_time>ustarttime, Experiment.start_time<uendtime)
-        filt_exp = self.session.query(Experiment).filter(conditions).all()
+        conditions = sqlalchemy.and_(ProcdbExperiment.inst_id==inst_id,
+                                     ProcdbExperiment.end_time>starttime,
+                                     ProcdbExperiment.start_time<endtime)
+        filt_exp = self.session.query(ProcdbExperiment).filter(conditions).all()
 
         return filt_exp
 
@@ -85,9 +95,9 @@ class AMISR_lookup(object):
         return exp_num
 
     def get_mode(self, exp):
-        mode_id = exp.mode_id
-        mode = self.session.query(RadarMode).filter(RadarMode.id==mode_id).one()
-        return mode.name
+        mode_id = exp.type_id
+        mode = self.session.query(ProcdbExperimentType).filter(ProcdbExperimentType.id==mode_id).one()
+        return mode.label
 
 
     def experiment_path(self, exp):

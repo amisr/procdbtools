@@ -1,10 +1,12 @@
 import os
 import sys
-from sqlalchemy import Column, ForeignKey, Integer, String, Boolean, Float
+from sqlalchemy import Column, ForeignKey, Integer, String, Boolean, Float, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import UniqueConstraint
 
 Base = declarative_base()
+
+   
 
 class Experiment(Base):
     __tablename__ = 'experiment'
