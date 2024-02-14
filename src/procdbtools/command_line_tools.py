@@ -8,13 +8,16 @@ from procdbtools.amisr_lookup import AMISR_lookup
 def lookup_single_time(radar, time):
     al = AMISR_lookup(radar)
     exp = al.find_experiment(time)
-    mode = al.get_mode(exp)
-    # print report
-    print('{:20}{:25}'.format('Exp Num', exp.name))
-    print('{:20}{:25}'.format('Concat Exp Num', exp.master_exp))
-    print('{:20}{:25}'.format('Mode', mode))
-    print('{:20}{:25}'.format('Start Time', str(exp.start_time)))
-    print('{:20}{:25}'.format('End Time', str(exp.end_time)))
+    if exp:
+        mode = al.get_mode(exp)
+        # print report
+        print('{:20}{:25}'.format('Exp Num', exp.name))
+        print('{:20}{:25}'.format('Concat Exp Num', exp.master_exp))
+        print('{:20}{:25}'.format('Mode', mode))
+        print('{:20}{:25}'.format('Start Time', str(exp.start_time)))
+        print('{:20}{:25}'.format('End Time', str(exp.end_time)))
+    else:
+        print('No Experiment at this time.')
 
 def lookup_time_range(radar, starttime, endtime):
     al = AMISR_lookup(radar)

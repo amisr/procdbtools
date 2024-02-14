@@ -81,7 +81,10 @@ class AMISR_lookup(object):
         conditions = sqlalchemy.and_(ProcdbExperiment.inst_id==inst_id,
                                      ProcdbExperiment.end_time>starttime,
                                      ProcdbExperiment.start_time<endtime)
-        filt_exp = self.session.query(ProcdbExperiment).filter(conditions).all()
+        try:
+            filt_exp = self.session.query(ProcdbExperiment).filter(conditions).all()
+        except sqlalchemy.exc.NoResultFound:
+            flit_exp = list()
 
         return filt_exp
 
@@ -98,7 +101,10 @@ class AMISR_lookup(object):
         conditions = sqlalchemy.and_(ProcdbExperiment.inst_id==inst_id,
                                      ProcdbExperiment.end_time>time,
                                      ProcdbExperiment.start_time<=time)
-        filt_exp = self.session.query(ProcdbExperiment).filter(conditions).one()
+        try:
+            filt_exp = self.session.query(ProcdbExperiment).filter(conditions).one()
+        except sqlalchemy.exc.NoResultFound:
+            filt_exp = None
 
         return filt_exp
 
