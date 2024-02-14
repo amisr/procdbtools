@@ -56,7 +56,6 @@ class AMISR_lookup(object):
         if not procdb_file:
             procdb_file = default_procdb_file
 
-
         engine = create_engine("sqlite:///{}".format(procdb_file))
         Session = sessionmaker(bind=engine)
         self.session = Session()
@@ -83,6 +82,23 @@ class AMISR_lookup(object):
                                      ProcdbExperiment.end_time>starttime,
                                      ProcdbExperiment.start_time<endtime)
         filt_exp = self.session.query(ProcdbExperiment).filter(conditions).all()
+
+        return filt_exp
+
+    def find_experiment(self, time):
+        """
+        Return experiment run at a particular time
+        """
+
+        # Get instrument ID number
+        inst = self.session.query(ProcdbInstrument).filter(ProcdbInstrument.abbr==self.radar).one()
+        inst_id = inst.id
+
+        # Find experiment by start/end times and radar id
+        conditions = sqlalchemy.and_(ProcdbExperiment.inst_id==inst_id,
+                                     ProcdbExperiment.end_time>time,
+                                     ProcdbExperiment.start_time<=time)
+        filt_exp = self.session.query(ProcdbExperiment).filter(conditions).one()
 
         return filt_exp
 
