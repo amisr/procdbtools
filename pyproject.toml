@@ -35,8 +35,8 @@ classifiers = [
 #"Homepage" = "https://github.com/amisr/amisrsynthdata"
 #"Bug Tracker" = "https://github.com/pypa/sampleproject/issues"
 
-#[project.scripts]
-#    amisrsynthdata = "amisrsynthdata.syntheticdata:main"
+[project.scripts]
+    amisrdbquery = "procdbtools.command_line_tools:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
