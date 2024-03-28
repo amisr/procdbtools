@@ -35,17 +35,27 @@ def main():
                         description='Basic utility to quickly look up the AMISR experiment number and mode for a given datetime.')
     
     parser.add_argument('radar')
-    parser.add_argument('time', default=None)
+    parser.add_argument('time', nargs='?', default=None)
+    parser.add_argument('-st', '--starttime')
     parser.add_argument('-et', '--endtime')
     
     args = parser.parse_args()
-    time = dt.datetime.fromisoformat(args.time)
-    
-    if args.endtime:
-        endtime = dt.datetime.fromisoformat(args.endtime)
-        lookup_time_range(args.radar, time, endtime)
+
+    if args.time:
+        print(args.time)
+        if len(args.time) <= 10:
+            starttime = dt.datetime.fromisoformat(args.time)
+            endtime = starttime + dt.timedelta(hours=24)
+            lookup_time_range(args.radar, starttime, endtime)
+        else:
+            time = dt.datetime.fromisoformat(args.time)
+            lookup_single_time(args.radar, time)
     else:
-        lookup_single_time(args.radar, time)
+    
+        starttime = dt.datetime.fromisoformat(args.starttime)
+        endtime = dt.datetime.fromisoformat(args.endtime)
+        lookup_time_range(args.radar, starttime, endtime)
+
 
 if __name__=='__main__':
     main()
