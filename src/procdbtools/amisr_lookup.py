@@ -108,18 +108,26 @@ class AMISR_lookup(object):
 
         return filt_exp
 
-    def experiment_number(self, starttime, endtime):
-        """
-        Return just a list of experiment numbers
-        """
-        exp_list = self.find_experiments(starttime, endtime)
-        exp_num = [exp.experiment for exp in exp_list]
-        return exp_num
 
     def get_mode(self, exp):
+        """
+        Return name of mode
+        """
         mode_id = exp.type_id
         mode = self.session.query(ProcdbExperimentType).filter(ProcdbExperimentType.id==mode_id).one()
         return mode.label
+
+
+    def get_experiment_number(self, exp):
+        """
+        Return functional experiment number (master or concatenated experiment number if it exists, otherwise just the number for that experiment
+        """
+        if exp.master_exp:
+            exp_num = exp.master_exp
+        else:
+            exp_num = exp.name
+        
+        return exp_num
 
 
     def experiment_path(self, exp):
@@ -127,13 +135,14 @@ class AMISR_lookup(object):
         Return the full path to a given experiment directory
         """
 
+        exp_num = self.get_experiment_number(exp)
         mode = self.get_mode(exp)
 
-        expdir = pathlib.Path(self.db_path, self.radar, f'{exp.start_year:04}', f'{exp.start_month:02}', mode, exp.experiment)
+        expdir = pathlib.Path(self.db_path, self.radar, exp_num[0:4], exp_num[4:6], mode, exp_num)
 
         # check if path exists before returning
         if not expdir.exists():
-            expdir = expdir.with_name(exp.experiment+'.done')
+            expdir = expdir.with_name(exp_num+'.done')
 
         if expdir.exists():
             return expdir
@@ -144,6 +153,8 @@ class AMISR_lookup(object):
 
     def select_datafile(self, exp, pulse=None, integration=None, cal=None, check_exists=False):
 
+        exp_num = self.get_experiment_number(exp)
+
         # Get path to experiment
         experiment_path = self.experiment_path(exp)
         if not experiment_path:
@@ -152,7 +163,7 @@ class AMISR_lookup(object):
         datafiles = [f.name for f in experiment_path.glob('*.h5')]
 
         # Reduce set to only files with the correct pulse
-        datafiles = [df for df in datafiles if df.startswith(f'{exp.experiment}_{pulse}')]
+        datafiles = [df for df in datafiles if df.startswith(f'{exp_num}_{pulse}')]
 
         if not datafiles:
             return None
@@ -169,7 +180,7 @@ class AMISR_lookup(object):
             timeres = min(int_times)
             integration = f'{timeres}min'
         # Select files with specified integration time
-        datafiles = [df for df in datafiles if df.startswith(f'{exp.experiment}_{pulse}_{integration}-')]
+        datafiles = [df for df in datafiles if df.startswith(f'{exp_num}_{pulse}_{integration}-')]
 
         # If cal not specified, use deault ordering
         if not cal:
@@ -180,7 +191,7 @@ class AMISR_lookup(object):
             else:
                 cal = ''
         # Select file with specified calibration
-        datafiles = [df for df in datafiles if df.startswith(f'{exp.experiment}_{pulse}_{integration}-{cal}')]
+        datafiles = [df for df in datafiles if df.startswith(f'{exp_num}_{pulse}_{integration}-{cal}')]
  
         try:
             datafile = datafiles[0]
@@ -198,6 +209,8 @@ class AMISR_lookup(object):
 
     def select_vvels_datafile(self, exp, pulse=None, integration=None, post_integrate=False, check_exists=False):
 
+        exp_num = self.get_experiment_number(exp)
+
         # Get path to experiment
         experiment_path = self.experiment_path(exp)
         if not experiment_path:
@@ -207,7 +220,7 @@ class AMISR_lookup(object):
         datafiles = [f.name for f in experiment_path.glob('*.h5')]
 
         # Reduce set to only files with the correct pulse
-        datafiles = [df for df in datafiles if df.startswith(f'{exp.experiment}_{pulse}')]
+        datafiles = [df for df in datafiles if df.startswith(f'{exp_num}_{pulse}')]
 
         if not datafiles:
             return None
@@ -226,7 +239,7 @@ class AMISR_lookup(object):
 
         # Select files with specified integration time
         if not post_integrate:
-            datafiles = [df for df in datafiles if df.startswith(f'{exp.experiment}_{pulse}_{integration}-')]
+            datafiles = [df for df in datafiles if df.startswith(f'{exp_num}_{pulse}_{integration}-')]
         else:
             datafiles = [df for df in datafiles if df.endswith(f'-{integration}.h5')]
 
