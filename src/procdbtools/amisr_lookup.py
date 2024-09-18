@@ -217,18 +217,18 @@ class AMISR_lookup(object):
             return None
         experiment_path = experiment_path.joinpath('derivedParams/new_vvels')
 
-        datafiles = [f.name for f in experiment_path.glob('*.h5')]
+        datafiles_all = [f.name for f in experiment_path.glob('*.h5')]
 
         # Reduce set to only files with the correct pulse
-        datafiles = [df for df in datafiles if df.startswith(f'{exp_num}_{pulse}')]
+        datafiles_ep = [df for df in datafiles_all if df.startswith(f'{exp_num}_{pulse}')]
 
-        if not datafiles:
+        if not datafiles_ep:
             return None
 
         # If no time resolution specified, find file with shortest integration time
         if not integration:
             int_times = list()
-            for df in datafiles:
+            for df in datafiles_ep:
                 time_re = re.search(r'\d+min', df)
                 if time_re:
                     int_times.append(int(time_re.group()[:-3]))
@@ -238,14 +238,13 @@ class AMISR_lookup(object):
             integration = f'{timeres}min'
 
         # Select files with specified integration time
-        if not post_integrate:
-            datafiles = [df for df in datafiles if df.startswith(f'{exp_num}_{pulse}_{integration}-')]
-        else:
-            datafiles = [df for df in datafiles if df.endswith(f'-{integration}.h5')]
+        datafiles_epi = [df for df in datafiles_ep if df.startswith(f'{exp_num}_{pulse}_{integration}') and df.endswith(f'vvels_lat.h5')]
+        if post_integrate and not datafiles_epi:
+            datafiles_epi = [df for df in datafiles_ep if df.startswith(f'{exp_num}_{pulse}') and df.endswith(f'vvels_lat-{integration}.h5')]
 
 
         try:
-            datafile = datafiles[0]
+            datafile = datafiles_epi[0]
         except IndexError:
             return None
 
