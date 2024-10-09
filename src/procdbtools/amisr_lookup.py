@@ -151,7 +151,7 @@ class AMISR_lookup(object):
 
 
 
-    def select_datafile(self, exp, pulse=None, integration=None, cal=None, check_exists=False):
+    def select_datafile(self, exp, pulse=None, integration=None, cal=None):
 
         exp_num = self.get_experiment_number(exp)
 
@@ -160,18 +160,16 @@ class AMISR_lookup(object):
         if not experiment_path:
             return None
 
-        datafiles = [f.name for f in experiment_path.glob('*.h5')]
+        datafiles_all = [f.name for f in experiment_path.glob('*.h5')]
 
         # Reduce set to only files with the correct pulse
-        datafiles = [df for df in datafiles if df.startswith(f'{exp_num}_{pulse}')]
-
-        if not datafiles:
-            return None
+        datafiles_ep = [df for df in datafiles_all if df.startswith(f'{exp_num}_{pulse}')]
 
         # If no time resolution specified, find file with shortest integration time
+        # Only consider minute integration times - less than that is atypical
         if not integration:
             int_times = list()
-            for df in datafiles:
+            for df in datafiles_ep:
                 time_re = re.search(r'\d+min', df)
                 if time_re:
                     int_times.append(int(time_re.group()[:-3]))
@@ -179,35 +177,31 @@ class AMISR_lookup(object):
                     continue
             timeres = min(int_times)
             integration = f'{timeres}min'
+
         # Select files with specified integration time
-        datafiles = [df for df in datafiles if df.startswith(f'{exp_num}_{pulse}_{integration}-')]
+        datafiles_epi = [df for df in datafiles_ep if df.startswith(f'{exp_num}_{pulse}_{integration}-')]
 
         # If cal not specified, use deault ordering
         if not cal:
-            if any([df.endswith('min-fitcal.h5') for df in datafiles]):
+            if any([df.endswith('fitcal.h5') for df in datafiles_epi]):
                 cal = 'fitcal'
-            elif any([df.endswith('min-cal.h5') for df in datafiles]):
+            elif any([df.endswith('cal.h5') for df in datafiles_epi]):
                 cal = 'cal'
             else:
                 cal = ''
-        # Select file with specified calibration
-        datafiles = [df for df in datafiles if df.startswith(f'{exp_num}_{pulse}_{integration}-{cal}')]
- 
-        try:
-            datafile = datafiles[0]
-        except IndexError:
-            return None
 
+        # Form the complete file name
+        datafile = f'{exp_num}_{pulse}_{integration}-{cal}.h5'
         filename = experiment_path.joinpath(datafile)
 
-        if check_exists:
-            if not filename.is_file():
-                return None
+        # Return filename if file exists, None if not
+        if filename.is_file():
+            return filename
+        else:
+            return None
 
-        return filename
 
-
-    def select_vvels_datafile(self, exp, pulse=None, integration=None, post_integrate=False, check_exists=False, vvels_exp_path='derivedParams/new_vvels'):
+    def select_vvels_datafile(self, exp, pulse=None, integration=None, cal=None, post_integrate=False, vvels_exp_path='derivedParams/new_vvels'):
 
         exp_num = self.get_experiment_number(exp)
 
@@ -218,6 +212,7 @@ class AMISR_lookup(object):
         experiment_path = experiment_path.joinpath(vvels_exp_path)
 
         datafiles_all = [f.name for f in experiment_path.glob('*.h5')]
+        #print(datafiles_all)
 
         # Reduce set to only files with the correct pulse
         datafiles_ep = [df for df in datafiles_all if df.startswith(f'{exp_num}_{pulse}')]
@@ -238,23 +233,48 @@ class AMISR_lookup(object):
             integration = f'{timeres}min'
 
         # Select files with specified integration time
-        datafiles_epi = [df for df in datafiles_ep if df.startswith(f'{exp_num}_{pulse}_{integration}') and df.endswith(f'vvels_lat.h5')]
-        if post_integrate and not datafiles_epi:
-            datafiles_epi = [df for df in datafiles_ep if df.startswith(f'{exp_num}_{pulse}') and df.endswith(f'vvels_lat-{integration}.h5')]
+        datafiles_epi = [df for df in datafiles_ep if df.startswith(f'{exp_num}_{pulse}_{integration}')]
 
+        # If cal not specified, use deault ordering
+        if not cal:
+            if any([df.endswith('fitcal-vvels_lat.h5') for df in datafiles_epi]):
+                cal = 'fitcal'
+            elif any([df.endswith('cal-vvels_lat.h5') for df in datafiles_epi]):
+                cal = 'cal'
+            else:
+                cal = ''
 
-        try:
-            datafile = datafiles_epi[0]
-        except IndexError:
-            return None
-
+        # Form the complete file name
+        datafile = f'{exp_num}_{pulse}_{integration}-{cal}-vvels_lat.h5'
         filename = experiment_path.joinpath(datafile)
 
-        if check_exists:
-            if not filename.is_file():
+        # If file does not exist, check for a post-integrated file
+        if post_integrate and not filename.is_file():
+
+            datafiles_epi = [df for df in datafiles_ep if df.startswith(f'{exp_num}_{pulse}') and df.endswith(f'vvels_lat-{integration}.h5')]
+
+            # If cal not specified, use deault ordering
+            if not cal:
+                if any([df.endswith(f'fitcal-vvels_lat-{integration}.h5') for df in datafiles_epi]):
+                    cal = 'fitcal'
+                elif any([df.endswith('cal-vvels_lat-{integration}.h5') for df in datafiles_epi]):
+                    cal = 'cal'
+                else:
+                    cal = ''
+
+            # Form complete file name
+            potential_files = [df for df in datafiles_epi if df.endswith(f'{cal}-vvels_lat-{integration}.h5')]
+            try:
+                datafile = potential_files[0]
+                filename = experiment_path.joinpath(datafile)
+            except IndexError:
                 return None
 
-        return filename
+        # Return filename if file exists, None if not
+        if filename.is_file():
+            return filename
+        else:
+            return None
 
 
 
