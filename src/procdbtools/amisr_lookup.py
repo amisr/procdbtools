@@ -82,7 +82,9 @@ class AMISR_lookup(object):
                                      ProcdbExperiment.end_time>starttime,
                                      ProcdbExperiment.start_time<endtime)
         try:
-            filt_exp = self.session.query(ProcdbExperiment).filter(conditions).all()
+            filt_exp = self.session.query(ProcdbExperiment).filter(conditions).order_by(ProcdbExperiment.name).all()
+            for exp in filt_exp:
+                print(exp.id, exp.name, exp.start_time, exp.status_date)
         except sqlalchemy.exc.NoResultFound:
             flit_exp = list()
 
@@ -164,6 +166,8 @@ class AMISR_lookup(object):
 
         # Reduce set to only files with the correct pulse
         datafiles_ep = [df for df in datafiles_all if df.startswith(f'{exp_num}_{pulse}')]
+        if not datafiles_ep:
+            return None
 
         # If no time resolution specified, find file with shortest integration time
         # Only consider minute integration times - less than that is atypical
@@ -180,6 +184,8 @@ class AMISR_lookup(object):
 
         # Select files with specified integration time
         datafiles_epi = [df for df in datafiles_ep if df.startswith(f'{exp_num}_{pulse}_{integration}-')]
+        if not datafiles_epi:
+            return None
 
         # If cal not specified, use deault ordering
         if not cal:
