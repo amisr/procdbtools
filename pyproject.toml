@@ -13,14 +13,7 @@ readme = "README.rst"
 license = { file = "LICENSE" }
 keywords = ["AMISR", "data"]
 requires-python = ">=3.7"
-#dependencies = [
-#    "numpy",
-#    "h5py",
-#    "pymap3d",
-#    "apexpy",
-#    "pyyaml",
-#    "importlib_resources",
-#]
+dependencies = ["sqlalchemy"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering",
@@ -31,18 +24,15 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-#[project.urls]
-#"Homepage" = "https://github.com/amisr/amisrsynthdata"
-#"Bug Tracker" = "https://github.com/pypa/sampleproject/issues"
+[project.urls]
+"Homepage" = "https://github.com/amisr/procdbtools"
+"Bug Tracker" = "https://github.com/amisr/procdbtools/issues"
 
 [project.scripts]
     amisrdbquery = "procdbtools.command_line_tools:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-procdbtools = ["experiment_info5.db"]
 
 [tool.pytest.ini_options]
 pythonpath = [

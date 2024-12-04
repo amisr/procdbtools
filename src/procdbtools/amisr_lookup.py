@@ -83,8 +83,8 @@ class AMISR_lookup(object):
                                      ProcdbExperiment.start_time<endtime)
         try:
             filt_exp = self.session.query(ProcdbExperiment).filter(conditions).order_by(ProcdbExperiment.name).all()
-            for exp in filt_exp:
-                print(exp.id, exp.name, exp.start_time, exp.status_date)
+            #for exp in filt_exp:
+            #    print(exp.id, exp.name, exp.start_time, exp.status_date)
         except sqlalchemy.exc.NoResultFound:
             flit_exp = list()
 
