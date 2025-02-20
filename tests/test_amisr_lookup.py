@@ -6,21 +6,23 @@ from pathlib import Path
 import datetime as dt
 from procdbtools.amisr_lookup import AMISR_lookup
 
-#starttime = dt.datetime(2013,4,8)
-#endtime = dt.datetime(2013,4,9)
+##starttime = dt.datetime(2013,4,8)
+##endtime = dt.datetime(2013,4,9)
+#starttime = dt.datetime(2014,3,8)
+#endtime = dt.datetime(2014,3,9)
 #
-#dbpath = '/Volumes/AMISR_SCRATCH/llamarche/AMISR_custom/new_vvels'
+##dbpath = '/Volumes/AMISR_SCRATCH/llamarche/AMISR_custom/new_vvels'
 ##dbpath = '/Volumes/AMISR_PROCESSED/processed_data'
-#amisrdb = AMISR_lookup('PFISR', db_path=dbpath)
-#experiments = amisrdb.find_experiments(starttime, endtime)
+#amisrdb = AMISR_lookup('PFISR')
+#experiments = amisrdb.find_experiments(starttime, endtime, no_duplicates=False)
 #for exp in experiments:
 #    print(exp.name)
-#    path = amisrdb.experiment_path(exp)
-#    #print(path)
+#    #path = amisrdb.experiment_path(exp)
+#    ##print(path)
 #
-#    #filename = amisrdb.select_datafile(exp, pulse='ac')
-#    filename = amisrdb.select_vvels_datafile(exp, pulse='lp', integration='5min', post_integrate=True)
-#    print(filename)
+#    #filename = amisrdb.select_datafile(exp, pulse='lp', integration='5min')
+#    ##filename = amisrdb.select_vvels_datafile(exp, pulse='lp', integration='5min', post_integrate=True)
+#    #print(filename)
 ##    filename = amisrdb.select_vvels_datafile(exp, pulse='lp', integration='5min', post_integrate=True)
 ##    print(filename)
 
@@ -49,6 +51,19 @@ def test_find_experiments(pfisrdb_processed):
     exp_num = [exp.name for exp in exp_list]
     assert exp_num == ['20130406.001','20130408.001','20130408.002']
     
+def test_find_experiments_concat(pfisrdb_processed):
+    starttime = dt.datetime(2014,3,8)
+    endtime = dt.datetime(2014,3,9)
+    exp_list = pfisrdb_processed.find_experiments(starttime, endtime)
+    exp_num = [exp.name for exp in exp_list]
+    assert exp_num == ['20140308.001', '20140308.002', '20140308.004', '20140308.005', '20140308.007', '20140308.009', '20140308.011', '20140308.012', '20140308.014', '20140308.015']
+
+def test_find_experiments_concat_with_duplicates(pfisrdb_processed):
+    starttime = dt.datetime(2014,3,8)
+    endtime = dt.datetime(2014,3,9)
+    exp_list = pfisrdb_processed.find_experiments(starttime, endtime, no_duplicates=False)
+    exp_num = [exp.name for exp in exp_list]
+    assert exp_num == ['20140308.001', '20140308.002', '20140308.003', '20140308.004', '20140308.005', '20140308.006', '20140308.007', '20140308.008', '20140308.009', '20140308.011', '20140308.012', '20140308.013', '20140308.014', '20140308.015', '20140308.016']
 
 def test_find_experiment(pfisrdb_processed):
     time = dt.datetime(2013,4,8,11,0,0)

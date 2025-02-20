@@ -68,7 +68,7 @@ class AMISR_lookup(object):
 
 
 
-    def find_experiments(self, starttime, endtime):
+    def find_experiments(self, starttime, endtime, no_duplicates=True):
         """
         Return list of all experiments between two times
         """
@@ -83,12 +83,22 @@ class AMISR_lookup(object):
                                      ProcdbExperiment.start_time<endtime)
         try:
             filt_exp = self.session.query(ProcdbExperiment).filter(conditions).order_by(ProcdbExperiment.name).all()
-            #for exp in filt_exp:
-            #    print(exp.id, exp.name, exp.start_time, exp.status_date)
         except sqlalchemy.exc.NoResultFound:
             flit_exp = list()
 
-        return filt_exp
+        if no_duplicates:
+            # remove any experiments included in a concatenated experiment already in the list
+            # If the returned list of experiments will be walked through with a file identified and opened for each, this is necessary to prevent the same concatenated file being accessed multiple times because multiple original (unconcatenated) experiment number refer back to the same file
+            non_dup_exp = list()
+            non_dup_exp_num = list()
+            for exp in filt_exp:
+                exp_num = self.get_experiment_number(exp)
+                if not exp_num in non_dup_exp_num:
+                    non_dup_exp_num.append(exp_num)
+                    non_dup_exp.append(exp)
+            return non_dup_exp
+        else:
+            return filt_exp
 
     def find_experiment(self, time):
         """
